@@ -312,6 +312,15 @@ details.foods[open] summary{margin-bottom:10px}
 .aibox p{margin:0}
 .aibox .ex-head{flex-wrap:wrap; row-gap:6px}
 .aibox .ex-head b{white-space:nowrap}
+.switch{position:relative; flex:none; width:52px; height:30px; padding:0; border:0; border-radius:999px; background:var(--line-strong); transition:background-color .2s ease}
+.switch::after{content:""; position:absolute; top:3px; left:3px; width:24px; height:24px; border-radius:50%; background:#fff; box-shadow:0 1px 3px rgba(0,0,0,.3); transition:transform .22s cubic-bezier(.2,.8,.2,1)}
+.switch[aria-checked="true"]{background:var(--day)}
+.switch[aria-checked="true"]::after{transform:translateX(22px)}
+.switch:disabled{opacity:.4}
+.swrow{display:flex; align-items:center; justify-content:space-between; gap:12px}
+.swrow > span{flex:1; min-width:0}
+.seg.sizes button{display:grid; gap:1px; padding:7px 4px}
+.seg.sizes small{font-size:12px; font-weight:500; color:var(--muted)}
 .aibox ul{margin:0; padding-left:18px; display:grid; gap:4px}
 .pbar{height:8px; border-radius:4px; background:color-mix(in srgb,var(--day) 18%,var(--surface)); overflow:hidden}
 .pbar i{display:block; height:100%; width:0; background:var(--day); border-radius:4px; transition:width .4s ease}
@@ -1419,8 +1428,10 @@ const LOCAL_MODELS = [
   {size:'Large', name:'Qwen3.5 4B', base:'Qwen3.5-4B', gb:2.39}
 ];
 const local = {cap:null, engine:null, worker:null, loading:null, cancel:null, progress:null, confirm:null, armed:false};
-const localCfg = () => Object.assign({tier:-1, id:'', ready:false}, lsGet('liftling.local') || {});
-const localReady = () => localCfg().ready;
+/* tier/id: the downloaded model; ready: fully downloaded; on: the person's switch; auto: start it when Liftling opens */
+const localCfg = () => Object.assign({tier:-1, id:'', ready:false, on:true, auto:true}, lsGet('liftling.local') || {});
+const saveLocalCfg = patch => lsSet('liftling.local', Object.assign(localCfg(), patch));
+const localReady = () => { const c = localCfg(); return c.ready && c.on; };
 const localModelId = (tier, f16) => `${LOCAL_MODELS[tier].base}-${f16 ? 'q4f16_1' : 'q4f32_1'}-MLC`;
 /* auto-pick: phones get Small (Medium with 6 GB+ memory), computers Medium (Large with 8 GB+), stepped down to fit free storage */
 async function detectDevice(){
@@ -1489,7 +1500,7 @@ async function loadLocal(){
 async function downloadLocal(tier){
   const cap = await detectDevice(), id = localModelId(tier, cap.f16), old = localCfg();
   if (old.id && old.id !== id) await deleteLocal(true);
-  lsSet('liftling.local', {tier, id, ready:false});
+  lsSet('liftling.local', {tier, id, ready:false, on:true, auto:old.auto});
   local.confirm = null;
   const job = loadLocal(); /* starts the download now, so the redraw below shows the progress bar */
   rerender();
@@ -1511,6 +1522,34 @@ async function deleteLocal(quiet){
   lsDel('liftling.local');
   if (!quiet) toast('On-device AI removed from this device');
 }
+/* "Start it when Liftling opens": load the AI in the background so the first answer comes straight away */
+function warmLocal(){
+  const c = localCfg();
+  if (!c.ready || !c.on || !c.auto || local.engine || local.loading) return;
+  loadLocal().then(() => {
+    const b = $('#localBox'); if (b) b.innerHTML = localBox();
+    /* the graphics chip sets itself up on the first answer, so give it a one-word practice run now rather than on the person's first question */
+    aiComplete({which:'local', system:'Reply with one word.', messages:[{role:'user', content:'Ready?'}], maxTokens:1}).catch(() => {});
+  }).catch(e => { if (/cleared/.test(e.message)) toast(e.message); rerender(); });
+}
+/* switching off keeps the download, so switching back on is instant; switching on the first time asks before downloading */
+async function toggleLocal(){
+  const c = localCfg();
+  if (c.on && (c.ready || local.loading)) {
+    stopLocal(); saveLocalCfg({on:false});
+    toast(local.loading ? 'Download stopped.' : 'On-device AI is off. It stays downloaded, so switching it back on is instant.');
+  } else if (c.ready) {
+    saveLocalCfg({on:true}); toast('On-device AI is on.');
+    if (c.auto) setTimeout(warmLocal, 0);
+  } else {
+    const cap = await detectDevice();
+    if (!cap.ok) { toast(cap.reason); return; }
+    local.confirm = local.pick != null ? local.pick : c.id ? c.tier : cap.tier;
+  }
+  rerender();
+}
+/* phones on mobile data, or with Data Saver on, get a heads-up before a big download */
+const meteredNote = () => { const n = navigator.connection; return n && (n.saveData || n.type === 'cellular') ? '<b>You seem to be on mobile data.</b> ' : ''; };
 
 /* ---------- one way in for both engines ---------- */
 /* chat and tips use on-device AI unless the person picked their cloud key instead */
@@ -1618,7 +1657,8 @@ const TOPICS = [
   [/eat|food|snack|meal|hungry|protein|breakfast|dinner/i, 'Before the gym: something light 30–60 minutes before, like a banana, toast, yogurt or crackers with cheese. After: a meal with a palm of protein, some carbs and fruit or veg. Drink water through the day. Liftling does not count calories.'],
   [/sleep|tired|bed ?time|nap|exhausted/i, 'Teens need 8–10 hours of sleep, adults 7–9. Same bedtime every day, screens off 30 minutes before lights out, no soda, coffee or energy drinks after 2 PM, and a cool, dark room.'],
   [/rest day|every day|how often|days a week|overtrain|day off/i, 'Muscles grow while resting. Beginners do well with 2–4 gym days a week and at least one full rest day.'],
-  [/warm ?up|stretch/i, 'Warm up with 5–10 minutes of easy cardio and arm circles, then a light set of the first exercise. Stretch after training, holding each stretch about 30 seconds.']
+  [/rest between|between sets|rest time|how long.*rest|rest timer/i, 'Rest about 60–90 seconds between sets, up to 2–3 minutes for heavy lifts. Liftling’s rest timer starts when you tick a set.'],
+  [/warm ?up|stretch/i,'Warm up with 5–10 minutes of easy cardio and arm circles, then a light set of the first exercise. Stretch after training, holding each stretch about 30 seconds.']
 ];
 const topicTips = text => TOPICS.filter(([re]) => re.test(text)).slice(0, 2).map(([, tip]) => '- ' + tip).join('\n');
 const groundTips = text => { const f = formTips(text), t = topicTips(text); return [f, t ? `Good advice:\n${t}` : ''].filter(Boolean).join('\n'); };
@@ -1741,12 +1781,24 @@ const sendSvg = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stro
 function coachView(){
   const which = aiWhich(), busy = state.chatBusy;
   const head = `<div class="hero"><span class="eyebrow">${which === 'local' ? 'On-device AI · private' : which ? 'Answered by ' + esc(providerName()) : 'Ask anything about training'}</span><h2>Coach</h2></div>`;
-  if (!which) return `${head}
+  if (!which) {
+    const cap = local.cap, cfg = localCfg(), downloading = !!local.loading && !cfg.ready;
+    if (!cap) detectDevice().then(() => { if (state.tab === 'coach') rerender(); });
+    const M = cap && cap.ok ? LOCAL_MODELS[cfg.id ? cfg.tier : cap.tier] : null;
+    const action = !cap ? '<p class="muted small">Checking what this device can run…</p>'
+      : downloading ? `<div class="pbar"><i data-lbar style="width:${Math.round(((local.progress && local.progress.progress) || 0) * 100)}%"></i></div><p class="small" data-ltext>${localStatusText(local.progress)}</p><p class="muted small">Keep this page open. You can chat as soon as it’s done.</p>`
+      : cfg.ready ? '<button type="button" class="primary" data-lswitch>Turn on the AI coach</button>'
+      : M ? `<p class="small">${meteredNote()}The <b>${M.size}</b> AI suits this device: a one-time <b>${M.gb} GB</b> download, then it works offline. Best on Wi-Fi.</p>
+        <button type="button" class="primary" data-ldl-go="${cfg.id ? cfg.tier : cap.tier}">Turn on · download ${M.gb} GB</button>`
+      : `<p class="muted small">${esc(cap.reason)} You can still use your own AI key.</p>`;
+    return `${head}
     <section class="card"><h3>Turn on the AI coach</h3>
-      <p class="muted small">Chat about exercises, soreness, food before the gym or sleep. The free on-device AI runs privately on this device after a one-time download, or you can use your own AI key.</p>
-      <button type="button" class="primary" data-gosettings>Set up AI</button>
+      <p class="muted small">Chat about exercises, soreness, food before the gym or sleep. Liftling runs the AI right on this device: free, private, and it works with no signal.</p>
+      ${action}
+      <button type="button" class="linkbtn" data-gosettings style="justify-self:start">More AI options</button>
     </section>
     <p class="note">The built-in coach that builds your workouts lives in <button type="button" class="linkbtn" data-plan>Your plan</button>.</p>`;
+  }
   /* only messages that weren't on screen before slide in */
   const msgs = state.chat.map((m, i) => `<div class="msg ${m.role === 'user' ? 'me' : 'ai'}${m.error ? ' err' : ''}${i >= state.chatSeen ? ' new' : ''}">${m.role === 'user' ? esc(m.content).replace(/\n/g, '<br>') : fmtAi(m.content)}</div>`).join('');
   state.chatSeen = state.chat.length;
@@ -1863,34 +1915,42 @@ ${contextLines()}`, messages:[{role:'user', content:`My week so far:\n${f.lines.
 
 /* ---------- Settings card ---------- */
 function localBox(){
-  const cap = local.cap, cfg = localCfg();
-  const head = `<div class="ex-head"><b>On-device AI</b><span class="tgt">free · private · offline</span></div>`;
+  const cap = local.cap, cfg = localCfg(), downloading = !!local.loading && !cfg.ready, isOn = cfg.on && (cfg.ready || downloading);
+  const sw = (attr, on, label, disabled) => `<button type="button" class="switch" role="switch" ${attr} aria-checked="${on}" aria-label="${label}" ${disabled ? 'disabled' : ''}></button>`;
+  const head = `<div class="ex-head"><b>On-device AI</b>${sw('data-lswitch', isOn, 'On-device AI', !cap || !cap.ok)}</div>
+    <p class="muted small">Runs inside Liftling on this device. Free, private and works with no signal.</p>`;
   if (!cap) {
-    detectDevice().then(() => { const b = $('#localBox'); if (b) b.innerHTML = localBox(); });
+    detectDevice().then(() => { const box = $('#localBox'); if (box) box.innerHTML = localBox(); });
     return head + '<p class="muted small">Checking what this device can run…</p>';
   }
-  const M = LOCAL_MODELS[cfg.tier] || LOCAL_MODELS[Math.max(0, cap.tier)];
-  if (local.loading && !cfg.ready) return `${head}
-    <div class="pbar"><i data-lbar style="width:${Math.round(((local.progress && local.progress.progress) || 0) * 100)}%"></i></div>
-    <p class="small" data-ltext>${localStatusText(local.progress)}</p>
-    <p class="muted small">${M.size} AI, ${M.gb} GB. Keep this page open; if it stops, it carries on from where it got to.</p>
-    <button type="button" class="linkbtn" data-lstop style="justify-self:start">Stop download</button>`;
-  if (cfg.ready) return `${head}
-    <p class="small">Ready: <b>${M.size}</b> (${M.name}), ${M.gb} GB saved on this device. Works with no signal.</p>
-    <button type="button" class="del" data-ldel>Remove from this device</button>`;
   if (!cap.ok) return `${head}<p class="muted small">${esc(cap.reason)} The built-in coach still works, and so does an AI key below.</p>`;
+  const M = LOCAL_MODELS[cfg.ready || cfg.id ? cfg.tier : (local.pick != null ? local.pick : cap.tier)];
+  const sizes = `<div class="seg sizes" role="group" aria-label="AI size">${LOCAL_MODELS.slice(0, cap.tier + 1).map((m, i) =>
+    `<button type="button" data-lsize="${i}" aria-pressed="${m === M}"><b>${m.size}${i === cap.tier ? ' ★' : ''}</b><small>${m.gb} GB</small></button>`).join('')}</div>
+    <p class="muted small">★ best for this device. Bigger is smarter but slower.</p>`;
   if (local.confirm != null) {
-    const C = LOCAL_MODELS[local.confirm];
+    const C = LOCAL_MODELS[local.confirm], swap = cfg.ready && local.confirm !== cfg.tier;
     return `${head}
-      <p class="small">Download the <b>${C.size}</b> AI (${C.name}): <b>${C.gb} GB</b>? It’s saved on this device and works offline afterwards. Best on Wi-Fi.</p>
+      <p class="small">${meteredNote()}${swap ? `Switch to the <b>${C.size}</b> AI (${C.name})? That downloads <b>${C.gb} GB</b> and removes the ${LOCAL_MODELS[cfg.tier].size} one.` : `Download the <b>${C.size}</b> AI (${C.name}): <b>${C.gb} GB</b>? It’s saved on this device and works offline afterwards. Best on Wi-Fi.`}</p>
       <button type="button" class="primary" data-ldl-go="${local.confirm}">Download ${C.gb} GB</button>
       <button type="button" class="linkbtn" data-ldl-cancel style="justify-self:center">Not now</button>`;
   }
-  const R = LOCAL_MODELS[cap.tier], resume = cfg.id && !cfg.ready;
+  if (downloading) return `${head}
+    <div class="pbar"><i data-lbar style="width:${Math.round(((local.progress && local.progress.progress) || 0) * 100)}%"></i></div>
+    <p class="small" data-ltext>${localStatusText(local.progress)}</p>
+    <p class="muted small">${M.size} AI, ${M.gb} GB. Keep this page open; switch off to stop, and it carries on from where it got to next time.</p>`;
+  if (cfg.ready) {
+    const status = !cfg.on ? 'Off' : local.engine ? 'On and running' : local.loading ? `<span data-ltext>${localStatusText(local.progress)}</span>` : 'On. It starts when you ask something';
+    return `${head}
+      <p class="small"><b>${status}</b> · ${M.size} (${M.name}), ${M.gb} GB on this device.${cfg.on ? '' : ' Switching on is instant.'}</p>
+      ${cfg.on ? `<div class="swrow"><span class="small">Start it when Liftling opens<br><span class="muted">Faster first answer, a little more battery</span></span>${sw('data-lauto', cfg.auto, 'Start the AI when Liftling opens')}</div>` : ''}
+      ${sizes}
+      <button type="button" class="del" data-ldel>Remove download</button>`;
+  }
+  const paused = cfg.id && !cfg.ready;
   return `${head}
-    <p class="small">${resume ? `Download paused: <b>${M.size}</b> (${M.name}), ${M.gb} GB.` : `Best for this device: <b>${R.size}</b> (${R.name}), a one-time ${R.gb} GB download.`}</p>
-    <button type="button" class="secondary" data-ldl="${resume ? cfg.tier : cap.tier}">${resume ? 'Resume download' : 'Set up on-device AI'}</button>
-    ${!resume && cap.tier > 0 ? `<button type="button" class="linkbtn" data-ldl="0" style="justify-self:start">Use the small one instead (0.45 GB)</button>` : ''}`;
+    <p class="small">${paused ? `Download paused: <b>${M.size}</b> (${M.name}), ${M.gb} GB. Switch on to carry on.` : `Off. Switch on to download the <b>${M.size}</b> AI (${M.name}), a one-time ${M.gb} GB download.`}</p>
+    ${paused ? '' : sizes}`;
 }
 function aiCard(){
   const c = aiCfg(), P = PROVIDERS[c.provider], attr = 'autocomplete="off" autocapitalize="off" spellcheck="false"', which = aiWhich();
@@ -2239,6 +2299,14 @@ view.addEventListener('click', async e => {
   if (t.closest('[data-import]')) { $('#importFile').click(); return; }
   if (t.closest('[data-import-cancel]')) { state.importing = null; softRender(); return; }
   /* on-device AI */
+  if (t.closest('[data-lswitch]')) { toggleLocal(); return; }
+  if (t.closest('[data-lauto]')) { const auto = !localCfg().auto; saveLocalCfg({auto}); if (auto) warmLocal(); rerender(); return; }
+  const lsize = t.closest('[data-lsize]');
+  if (lsize) {
+    const i = Number(lsize.dataset.lsize), c = localCfg();
+    if (c.ready) { if (i !== c.tier) local.confirm = i; } else local.pick = i;
+    rerender(); return;
+  }
   const ldl = t.closest('[data-ldl]');
   if (ldl) { local.confirm = Number(ldl.dataset.ldl); rerender(); return; }
   const ldlGo = t.closest('[data-ldl-go]');
@@ -2279,6 +2347,8 @@ loadDraft();
 render();
 /* offline + install only work on a real web address, not a file opened from disk */
 if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost')) navigator.serviceWorker.register('sw.js').catch(() => {});
+/* on-device AI that's switched on (with auto-start) wakes up in the background once the app has drawn */
+setTimeout(warmLocal, 1500);
 /* ask the browser not to clear our storage when space runs low */
 try { navigator.storage.persist().catch(() => {}); } catch(e){}
 setInterval(() => { if (state.tab === 'workout' && !state.sub) { const tl = view.querySelector('.timeline'); if (tl) tl.outerHTML = timelineHtml(true); } }, 60000);
