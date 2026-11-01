@@ -1,5 +1,16 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Iron Log</title>
-<meta name="claude:viewport-fit-sides" content="cover">
+<meta name="description" content="Log workouts, food and sleep. Everything stays on this device.">
+<meta name="theme-color" content="#EEF1F4" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0E1318" media="(prefers-color-scheme: dark)">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Iron Log">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Ccircle cx='32' cy='32' r='30' fill='%231D59C4'/%3E%3Ccircle cx='32' cy='32' r='8' fill='%23EEF1F4'/%3E%3C/svg%3E">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&family=Barlow:wght@400;500;600&family=IBM+Plex+Mono:wght@500&display=swap">
@@ -34,7 +45,7 @@ body[data-day="C"]{--day:var(--plate-c); --day-ink:#FFFFFF}
 body[data-tab="sleep"]{--day:var(--night); --day-ink:#FFFFFF}
 
 *{box-sizing:border-box}
-body{background:var(--bg); color:var(--ink); font-family:var(--body); font-size:16px; line-height:1.45; -webkit-text-size-adjust:100%}
+body{margin:0; background:var(--bg); color:var(--ink); font-family:var(--body); font-size:16px; line-height:1.45; -webkit-text-size-adjust:100%}
 body::before{content:""; position:fixed; inset:0 0 auto; height:env(safe-area-inset-top,0px); z-index:10; background:var(--bg)}
 .wrap{max-width:620px; margin:0 auto; padding-left:max(16px,env(safe-area-inset-left,0px)); padding-right:max(16px,env(safe-area-inset-right,0px))}
 button,input,select,textarea{font:inherit; color:inherit}
@@ -49,8 +60,12 @@ p{margin:0}
 .brand span{color:var(--day)}
 .sync{font-size:12px; color:var(--muted); display:flex; align-items:center; gap:6px}
 .sync i{width:7px; height:7px; border-radius:50%; background:var(--muted)}
-.sync[data-state="db"] i{background:var(--good)}
 .sync[data-state="local"] i{background:var(--plate-b)}
+.sync[data-state="off"] i{background:var(--warn)}
+.top-r{margin-left:auto; display:flex; align-items:center; gap:12px; min-width:0}
+.gear{flex:none; width:40px; height:40px; padding:0; border-radius:50%; border:1px solid var(--line); background:var(--surface); color:var(--muted); display:grid; place-items:center}
+.gear svg{width:20px; height:20px}
+.gear[aria-pressed="true"]{background:var(--day); border-color:var(--day); color:var(--day-ink)}
 
 main .wrap{padding-block:12px calc(var(--nav-h) + 110px); display:grid; gap:14px}
 .hero{display:grid; gap:2px; padding-top:6px}
@@ -154,6 +169,8 @@ textarea{width:100%; border:1px solid var(--line); border-radius:10px; backgroun
 .legend div{background:var(--sunk); border-radius:10px; padding:8px 4px; min-width:0}
 .legend b{display:block; font-size:13px}
 .legend span{font-size:12px; color:var(--muted)}
+.legend.three{grid-template-columns:repeat(3,1fr)}
+.legend.three b{font-family:var(--display); font-weight:700; font-size:26px; line-height:1.1}
 .opt{border:1px solid var(--line); border-radius:12px; padding:12px 14px; display:grid; gap:8px; background:var(--sunk)}
 .opt-top{display:flex; justify-content:space-between; gap:10px; align-items:baseline}
 .opt-top b{font-size:15px}
@@ -229,11 +246,18 @@ details.foods[open] summary{margin-bottom:10px}
 .toast{position:fixed; left:50%; transform:translateX(-50%); bottom:calc(var(--nav-h) + 76px + env(safe-area-inset-bottom,0px)); z-index:30; background:var(--ink); color:var(--bg); padding:10px 16px; border-radius:999px; font-weight:600; font-size:15px; max-width:calc(100% - 32px); text-align:center}
 @media (prefers-reduced-motion:no-preference){.rest .bar i{transition:width .9s linear}}
 </style>
+</head>
+<body>
 
 <header class="top">
   <div class="wrap">
     <h1 class="brand">Iron <span>Log</span></h1>
-    <div class="sync" id="sync" data-state="wait"><i></i><span id="syncText">Connecting…</span></div>
+    <div class="top-r">
+      <div class="sync" id="sync" data-state="local"><i></i><span id="syncText">Saved on this device</span></div>
+      <button type="button" class="gear" id="gear" aria-label="Settings" aria-pressed="false">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg>
+      </button>
+    </div>
   </div>
 </header>
 <main><div class="wrap" id="view"></div></main>
@@ -344,81 +368,52 @@ const toMin = hm => { const [h,m] = String(hm||'0:0').split(':').map(Number); re
 const fmt12 = mins => { mins = ((mins % 1440) + 1440) % 1440; const h = Math.floor(mins/60), m = mins%60; return `${h%12||12}:${pad(m)} ${h<12?'AM':'PM'}`; };
 const fmtDur = mins => `${Math.floor(mins/60)}h ${pad(mins%60)}m`;
 const lsGet = k => { try { return JSON.parse(localStorage.getItem(k)); } catch(e){ return null; } };
-const lsSet = (k,v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch(e){} };
+const lsSet = (k,v) => { try { localStorage.setItem(k, JSON.stringify(v)); return true; } catch(e){ return false; } };
 const lsDel = k => { try { localStorage.removeItem(k); } catch(e){} };
 const isGymDay = d => [1,3,5].includes(d.getDay());
 const pruneKeys = (obj, keep) => { const ks = Object.keys(obj||{}).sort(); const out = {}; ks.slice(-keep).forEach(k => out[k] = obj[k]); return out; };
 
 /* ================= storage ================= */
+/* Everything lives in this browser's localStorage under ironlog.* keys. Settings exports and imports a JSON backup. */
 const DEF_SLEEP = () => ({wake:'06:45', goal:9, nights:{}});
 const DEF_FOOD = () => ({skip:[], days:{}});
-const store = {mode:'wait', sessions:[], sleep:DEF_SLEEP(), food:DEF_FOOD(), db:null, uid:null, col:null};
-function setSync(mode, text){ store.mode = mode; $('#sync').dataset.state = mode; $('#syncText').textContent = text; }
-function useLocal(note){
-  store.db = null; store.col = null;
+const store = {ok:true, sessions:[], sleep:DEF_SLEEP(), food:DEF_FOOD()};
+function setSync(mode, text){ $('#sync').dataset.state = mode; $('#syncText').textContent = text; }
+function storageWorks(){ try { localStorage.setItem('ironlog.test','1'); localStorage.removeItem('ironlog.test'); return true; } catch(e){ return false; } }
+function loadStore(){
   store.sessions = (lsGet('ironlog.sessions') || []).sort((a,b)=>b.ts-a.ts);
   store.sleep = Object.assign(DEF_SLEEP(), lsGet('ironlog.sleep') || {});
   store.food = Object.assign(DEF_FOOD(), lsGet('ironlog.food') || {});
-  setSync('local', note || 'Saved on this device');
-  refreshDraft(); render();
 }
-async function initStore(){
-  const c = window.claude;
-  if (!c || typeof c.use !== 'function') { useLocal(); return; }
-  let db = null, user = null;
-  try { [db, user] = await Promise.all([c.use('db'), c.use('user')]); } catch(e){}
-  if (!db || !user) { useLocal(); return; }
-  let id = null; try { id = await user.id(); } catch(e){}
-  if (!id) { useLocal(); return; }
-  try { store.col = db.collection('data/users/' + id); } catch(e){ useLocal(); return; }
-  store.db = db; store.uid = id;
-  setSync('wait', 'Loading…');
-  const timer = setTimeout(() => { if (store.mode === 'wait') setSync('wait', 'Can’t reach your saved data yet'); }, 10000);
-  const fail = () => { clearTimeout(timer); useLocal('Saved on this device'); };
-  store.col.orderBy('ts','desc').limit(500).onSnapshot(snap => {
-    store.sessions = snap.docs.filter(d => d.id !== 'sleep' && d.id !== 'food').map(d => d.data()).filter(x => x && x.entries);
-    if (!snap.metadata.fromCache) { clearTimeout(timer); setSync('db', 'Synced'); }
-    if (state.tab !== 'workout' || !state.touched) { refreshDraft(); softRender(); }
-  }, fail);
-  ['sleep','food'].forEach(k => {
-    store.db.doc(`data/users/${id}/${k}`).onSnapshot(snap => {
-      if (writers[k] && (writers[k].busy || writers[k].pending)) return;
-      const base = k === 'sleep' ? DEF_SLEEP() : DEF_FOOD();
-      store[k] = Object.assign(base, snap.exists ? snap.data() : {});
-      if (state.tab === k) softRender();
-    }, () => {});
-  });
+function initStore(){
+  store.ok = storageWorks();
+  loadStore();
+  if (store.ok) setSync('local', 'Saved on this device');
+  else setSync('off', 'Can’t save in this browser');
 }
-const writers = {};
-function saveDoc(k, obj, delay){
-  store[k] = obj;
-  if (!store.db) { lsSet('ironlog.'+k, obj); return; }
-  const w = writers[k] || (writers[k] = {busy:false, pending:null, t:null});
-  w.pending = JSON.parse(JSON.stringify(obj));
-  clearTimeout(w.t);
-  w.t = setTimeout(async () => {
-    if (w.busy) return;
-    w.busy = true;
-    while (w.pending) { const o = w.pending; w.pending = null; try { await store.db.doc(`data/users/${store.uid}/${k}`).set(o); } catch(e){ lsSet('ironlog.'+k, o); } }
-    w.busy = false;
-  }, delay || 0);
+let saveWarned = false;
+function persist(k, v){
+  const ok = lsSet('ironlog.'+k, v);
+  if (ok) saveWarned = false;
+  else if (!saveWarned) { saveWarned = true; toast('Couldn’t save. Browser storage is full or turned off. Export a backup in Settings.'); }
+  return ok;
 }
-async function saveSession(s){
-  if (store.col) {
-    try { await store.col.doc(s.id).set(s); return; }
-    catch(e){ try { await new Promise(r=>setTimeout(r,900)); await store.col.doc(s.id).set(s); return; } catch(e2){ useLocal('Saved on this device'); } }
-  }
-  const all = (lsGet('ironlog.sessions') || []).filter(x => x.id !== s.id);
-  all.push(s); lsSet('ironlog.sessions', all);
-  store.sessions = all.sort((a,b)=>b.ts-a.ts);
+function saveDoc(k, obj){ store[k] = obj; return persist(k, obj); }
+function saveSession(s){
+  store.sessions = store.sessions.filter(x => x.id !== s.id).concat(s).sort((a,b)=>b.ts-a.ts);
+  return persist('sessions', store.sessions);
 }
-async function deleteSession(id){
-  if (store.col) { try { await store.col.doc(id).delete(); return; } catch(e){} }
-  const all = (lsGet('ironlog.sessions') || []).filter(x => x.id !== id);
-  lsSet('ironlog.sessions', all);
+function deleteSession(id){
   store.sessions = store.sessions.filter(x => x.id !== id);
+  persist('sessions', store.sessions);
   render();
 }
+/* another tab of Iron Log saved something: pick it up, like the old live sync did */
+window.addEventListener('storage', e => {
+  if (e.key && (!e.key.startsWith('ironlog.') || e.key === 'ironlog.draft')) return;
+  loadStore(); refreshDraft();
+  if (state.tab !== 'workout' || !state.touched) softRender();
+});
 
 /* ================= schedule ================= */
 function pickDay(now){
@@ -456,7 +451,7 @@ function suggest(exId){
   else if (ex.kind === 'time' && sets.length >= 3) { const mn = Math.min(...reps); if (mn >= 20) up = `Aim for ${Math.min(60, Math.max(...reps)+5)}s holds`; }
   return {w: (ex.kind === 'time' || ex.kind === 'reps') ? '' : w, last, up};
 }
-let state = {tab:'workout', sub:null, day:pickDay(new Date()), draft:null, touched:false, meal:null, seed:0};
+let state = {tab:'workout', sub:null, back:null, importing:null, day:pickDay(new Date()), draft:null, touched:false, meal:null, seed:0};
 function newDraft(day){
   return {
     id:'s'+Date.now().toString(36)+Math.random().toString(36).slice(2,6),
@@ -483,10 +478,12 @@ function render(){
   document.body.dataset.day = state.day;
   document.body.dataset.tab = state.tab;
   document.querySelectorAll('.nav button').forEach(b => b.setAttribute('aria-selected', String(b.dataset.tab === state.tab)));
+  $('#gear').setAttribute('aria-pressed', String(state.tab === 'settings'));
   const v = $('#view');
   if (state.tab === 'workout') v.innerHTML = state.sub === 'plan' ? planView() : workoutView();
   else if (state.tab === 'food') v.innerHTML = foodView();
   else if (state.tab === 'sleep') v.innerHTML = sleepView();
+  else if (state.tab === 'settings') v.innerHTML = settingsView();
   else v.innerHTML = progressView();
 }
 function softRender(){
@@ -797,6 +794,118 @@ function progressView(){
     <div class="sect"><h4>History</h4><span class="muted small">${S.length} workout${S.length===1?'':'s'}</span></div><div class="hist">${hist}</div>`;
 }
 
+/* ---------- settings: backup ---------- */
+const BACKUP_FORMAT = 1;
+const isYmd = s => typeof s === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(s) && !isNaN(parseYmd(s));
+const isHm = s => typeof s === 'string' && /^\d{1,2}:\d{2}$/.test(s);
+const plural = (n, w) => `${n} ${w}${n === 1 ? '' : 's'}`;
+const shortDate = d => d.toLocaleDateString(undefined,{month:'short', day:'numeric', year: d.getFullYear() === new Date().getFullYear() ? undefined : 'numeric'});
+function exportData(){
+  const now = new Date();
+  const data = {app:'Iron Log', format:BACKUP_FORMAT, exported:now.toISOString(), sessions:store.sessions, sleep:store.sleep, food:store.food};
+  const url = URL.createObjectURL(new Blob([JSON.stringify(data, null, 2)], {type:'application/json'}));
+  const a = document.createElement('a');
+  a.href = url; a.download = `iron-log-backup-${ymd(now)}.json`;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 2000);
+  lsSet('ironlog.lastExport', now.getTime());
+  toast('Backup downloaded'); softRender();
+}
+/* a backup file is outside data: keep only well-formed records so a bad file can't break the views */
+function cleanSession(s){
+  if (!s || typeof s !== 'object' || typeof s.id !== 'string' || !s.id || !PLAN[s.day] || !isYmd(s.date) || !Array.isArray(s.entries)) return null;
+  const entries = s.entries
+    .filter(e => e && typeof e.ex === 'string' && Array.isArray(e.sets))
+    .map(e => ({ex:e.ex, sets:e.sets.filter(x => x && filled(x) && !isNaN(Number(x.r))).map(x => ({w:String(x.w ?? '').replace(/[^0-9.]/g,''), r:Number(x.r)}))}))
+    .filter(e => e.sets.length);
+  const c = s.cardio || {};
+  return {id:s.id.slice(0,60), day:s.day, date:s.date, ts:Number(s.ts) || parseYmd(s.date).getTime(),
+    warm:!!s.warm, stretch:!!s.stretch, notes: typeof s.notes === 'string' ? s.notes : '',
+    cardio:{type: typeof c.type === 'string' ? c.type : 'Incline walk', min:Number(c.min) || 0}, entries};
+}
+function readBackup(text){
+  let o; try { o = JSON.parse(text); } catch(e){ throw new Error('That file isn’t a valid backup. Pick the .json file Iron Log exported.'); }
+  if (!o || o.app !== 'Iron Log') throw new Error('That file isn’t an Iron Log backup.');
+  if (Number(o.format) > BACKUP_FORMAT) throw new Error('That backup is from a newer version of Iron Log.');
+  const sl = o.sleep || {}, fd = o.food || {}, nights = {}, days = {}, foodIds = new Set(FOODS.map(f => f.id));
+  Object.entries(sl.nights || {}).forEach(([k,v]) => { if (isYmd(k) && v && isHm(v.bed) && isHm(v.wake)) nights[k] = {bed:v.bed, wake:v.wake}; });
+  Object.entries(fd.days || {}).forEach(([k,v]) => {
+    if (!isYmd(k) || !v) return;
+    const m = v.meals || {};
+    days[k] = {meals:{b:!!m.b, l:!!m.l, s:!!m.s, d:!!m.d}, water:Math.max(0, Math.min(8, Math.round(Number(v.water) || 0)))};
+  });
+  const exported = new Date(o.exported);
+  return {
+    exported: isNaN(exported) ? null : exported,
+    sessions: (Array.isArray(o.sessions) ? o.sessions : []).map(cleanSession).filter(Boolean),
+    nights, days,
+    wake: isHm(sl.wake) ? sl.wake : null,
+    goal: [8,9,10].includes(Number(sl.goal)) ? Number(sl.goal) : null,
+    skip: Array.isArray(fd.skip) ? fd.skip.filter(id => foodIds.has(id)) : null
+  };
+}
+async function pickBackup(file){
+  if (!file) return;
+  if (file.size > 10*1024*1024) { toast('That file is too big to be an Iron Log backup.'); return; }
+  let text; try { text = await file.text(); } catch(e){ toast('Couldn’t read that file.'); return; }
+  try {
+    const b = readBackup(text), have = new Set(store.sessions.map(s => s.id));
+    state.importing = {name:file.name, b, fresh:b.sessions.filter(s => !have.has(s.id)).length};
+    softRender();
+  } catch(err){ toast(err.message); }
+}
+/* merge: nothing already here is deleted; on a matching workout id or date the file's copy wins */
+function applyBackup(b){
+  const byId = new Map(store.sessions.map(s => [s.id, s]));
+  b.sessions.forEach(s => byId.set(s.id, s));
+  store.sessions = [...byId.values()].sort((x,y) => y.ts - x.ts);
+  const okS = persist('sessions', store.sessions);
+  const sl = JSON.parse(JSON.stringify(store.sleep));
+  if (b.wake) sl.wake = b.wake;
+  if (b.goal) sl.goal = b.goal;
+  sl.nights = pruneKeys(Object.assign({}, sl.nights, b.nights), 60);
+  const fd = JSON.parse(JSON.stringify(store.food));
+  if (b.skip) fd.skip = b.skip;
+  fd.days = pruneKeys(Object.assign({}, fd.days, b.days), 30);
+  const okSl = saveDoc('sleep', sl), okF = saveDoc('food', fd);
+  refreshDraft();
+  return okS && okSl && okF;
+}
+function settingsView(){
+  const n = store.sessions.length, nights = Object.keys(store.sleep.nights || {}).length, days = Object.keys(store.food.days || {}).length;
+  const last = lsGet('ironlog.lastExport'), imp = state.importing;
+  const restore = imp ? `<div class="opt">
+        <div class="opt-top"><b>${esc(imp.name)}</b><span class="num">${imp.b.exported ? 'saved ' + esc(shortDate(imp.b.exported)) : ''}</span></div>
+        <ul><li><span>Workouts</span><span>${imp.b.sessions.length} · ${imp.fresh} new</span></li>
+          <li><span>Nights of sleep</span><span>${Object.keys(imp.b.nights).length}</span></li>
+          <li><span>Food days</span><span>${Object.keys(imp.b.days).length}</span></li></ul>
+      </div>
+      <button type="button" class="primary" data-import-go>Add to my data</button>
+      <button type="button" class="linkbtn" data-import-cancel style="justify-self:center">Cancel</button>`
+    : `<button type="button" class="secondary" data-import>Import data</button>`;
+  return `
+    <button type="button" class="linkbtn" data-close-settings style="justify-self:start">← Back</button>
+    <div class="hero"><span class="eyebrow">Your data</span><h2>Settings</h2></div>
+    <section class="card" aria-labelledby="h-backup">
+      <div class="ex-head"><h3 id="h-backup">Back up</h3><span class="tgt num">${last ? 'last ' + esc(shortDate(new Date(last))) : 'never backed up'}</span></div>
+      <p class="muted small">Your logs live only in this browser on this device. Clearing browser data or switching phones erases them, so save a backup every week or two.</p>
+      <div class="legend three" aria-label="Saved on this device">
+        <div><b>${n}</b><span>${n === 1 ? 'workout' : 'workouts'}</span></div>
+        <div><b>${nights}</b><span>${nights === 1 ? 'night' : 'nights'} of sleep</span></div>
+        <div><b>${days}</b><span>food ${days === 1 ? 'day' : 'days'}</span></div>
+      </div>
+      <button type="button" class="primary" data-export>Export my data</button>
+      <p class="muted small">Downloads a .json file. Keep it somewhere safe, like your email or a cloud drive.</p>
+    </section>
+    <section class="card" aria-labelledby="h-restore">
+      <h3 id="h-restore">Restore from a backup</h3>
+      <p class="muted small">Pick an Iron Log backup file. Its logs are added to what’s already here and nothing is deleted. If a workout, night or food day is in both, the file’s copy is kept.</p>
+      ${restore}
+      <input type="file" id="importFile" accept=".json,application/json" hidden>
+    </section>
+    <p class="note">Backups also carry your wake time, sleep goal and the foods you turned off. A workout you haven’t saved yet isn’t included.</p>`;
+}
+
 /* ================= rest timer + toast ================= */
 let rest = {end:0, total:90, t:null};
 function startRest(sec){ rest.total = sec; rest.end = Date.now() + sec*1000; $('#rest').hidden = false; $('#rest').classList.remove('over'); clearInterval(rest.t); tickRest(); rest.t = setInterval(tickRest, 250); }
@@ -816,7 +925,12 @@ function toast(msg){ const t = $('#toast'); t.textContent = msg; t.hidden = fals
 document.querySelector('.nav').addEventListener('click', e => {
   const b = e.target.closest('[data-tab]'); if (!b) return;
   if (state.tab === b.dataset.tab) { state.sub = null; }
-  state.tab = b.dataset.tab; render(); window.scrollTo(0,0);
+  state.tab = b.dataset.tab; state.importing = null; render(); window.scrollTo(0,0);
+});
+function closeSettings(){ state.tab = state.back || 'workout'; state.importing = null; render(); window.scrollTo(0,0); }
+$('#gear').addEventListener('click', () => {
+  if (state.tab === 'settings') { closeSettings(); return; }
+  state.back = state.tab; state.tab = 'settings'; render(); window.scrollTo(0,0);
 });
 const view = $('#view');
 view.addEventListener('input', e => {
@@ -836,6 +950,7 @@ view.addEventListener('input', e => {
 });
 view.addEventListener('change', e => {
   const el = e.target;
+  if (el.id === 'importFile') { pickBackup(el.files && el.files[0]); el.value = ''; return; }
   if (el.dataset.flag) { state.draft[el.dataset.flag] = el.checked; persistDraft(); }
   else if (el.dataset.cardio === 'type') { state.draft.cardio.type = el.value; persistDraft(); }
   else if (el.dataset.meal) {
@@ -845,7 +960,7 @@ view.addEventListener('change', e => {
     saveDoc('food', f);
   }
   else if (el.dataset.sleep === 'wake' && el.value) {
-    const s = JSON.parse(JSON.stringify(store.sleep)); s.wake = el.value; saveDoc('sleep', s, 400); softRenderAfterBlur();
+    const s = JSON.parse(JSON.stringify(store.sleep)); s.wake = el.value; saveDoc('sleep', s); softRenderAfterBlur();
   }
 });
 function softRenderAfterBlur(){ const a = document.activeElement; if (a && a.blur) a.blur(); softRender(); }
@@ -882,12 +997,11 @@ view.addEventListener('click', async e => {
     const d = state.draft;
     const logged = d.entries.reduce((a,en)=>a+en.sets.filter(s=>s.r!=='').length,0);
     if (!logged && !Number(d.cardio.min)) { toast('Fill in reps for at least one set first.'); return; }
-    const btn = t.closest('#finish'); btn.disabled = true; btn.textContent = 'Saving…';
     const s = {...d, ts:Date.now(), cardio:{type:d.cardio.type, min:Number(d.cardio.min)||0},
       entries: d.entries.map(en=>({ex:en.ex, sets:en.sets.filter(x=>x.r!=='').map(x=>({w:x.w, r:Number(x.r)}))})).filter(en=>en.sets.length)};
-    await saveSession(s);
+    const ok = saveSession(s);
     lsDel('ironlog.draft'); stopRest();
-    toast(`Saved ${PLAN[d.day].weekday}’s workout`);
+    toast(ok ? `Saved ${PLAN[d.day].weekday}’s workout` : 'This browser couldn’t store the workout. Export a backup in Settings before closing.');
     state.draft = newDraft(state.day); state.touched = false;
     state.tab = 'progress'; render(); window.scrollTo(0,0); return;
   }
@@ -897,7 +1011,7 @@ view.addEventListener('click', async e => {
     const f = JSON.parse(JSON.stringify(store.food)), {k, d} = foodDay();
     const n = Number(cup.dataset.cup), cur = Number(d.water)||0;
     f.days = f.days || {}; f.days[k] = Object.assign({meals:{}, water:0}, f.days[k]); f.days[k].water = (n === cur) ? n-1 : n; f.days = pruneKeys(f.days, 30);
-    saveDoc('food', f, 600); softRender(); return;
+    saveDoc('food', f); softRender(); return;
   }
   const mp = t.closest('[data-mealpick]');
   if (mp) { state.meal = mp.dataset.mealpick; state.seed = 0; softRender(); return; }
@@ -906,14 +1020,14 @@ view.addEventListener('click', async e => {
   if (chip) {
     const f = JSON.parse(JSON.stringify(store.food)), id = chip.dataset.food, set = new Set(f.skip || []);
     set.has(id) ? set.delete(id) : set.add(id); f.skip = [...set];
-    saveDoc('food', f, 600);
+    saveDoc('food', f);
     const det = chip.closest('details'); const y = window.scrollY; render(); window.scrollTo(0,y);
     if (det) { const nd = view.querySelector('details.foods'); if (nd) nd.open = true; }
     return;
   }
   /* sleep */
   const goal = t.closest('[data-goal]');
-  if (goal) { const s = JSON.parse(JSON.stringify(store.sleep)); s.goal = Number(goal.dataset.goal); saveDoc('sleep', s, 400); softRender(); return; }
+  if (goal) { const s = JSON.parse(JSON.stringify(store.sleep)); s.goal = Number(goal.dataset.goal); saveDoc('sleep', s); softRender(); return; }
   if (t.closest('[data-savesleep]')) {
     const bed = $('#bedLog').value, wake = $('#wakeLog').value;
     if (!bed || !wake) { toast('Enter both times first.'); return; }
@@ -921,6 +1035,16 @@ view.addEventListener('click', async e => {
     s.nights[ymd(new Date())] = {bed, wake}; s.nights = pruneKeys(s.nights, 60);
     saveDoc('sleep', s); state.sleepBed = null; state.sleepWake = null;
     toast(`Saved ${fmtDur(durOf(bed, wake))} of sleep`); softRenderAfterBlur(); return;
+  }
+  /* settings */
+  if (t.closest('[data-close-settings]')) { closeSettings(); return; }
+  if (t.closest('[data-export]')) { exportData(); return; }
+  if (t.closest('[data-import]')) { $('#importFile').click(); return; }
+  if (t.closest('[data-import-cancel]')) { state.importing = null; softRender(); return; }
+  if (t.closest('[data-import-go]') && state.importing) {
+    const ok = applyBackup(state.importing.b); state.importing = null;
+    toast(ok ? `Imported. You now have ${plural(store.sessions.length, 'workout')}.` : 'Imported for now, but this browser couldn’t store it.');
+    softRender(); return;
   }
   /* progress */
   const del = t.closest('[data-del]');
@@ -931,9 +1055,11 @@ view.addEventListener('click', async e => {
   }
 });
 
+initStore();
 loadDraft();
 render();
-initStore();
 setInterval(() => { if (state.tab === 'workout' && !state.sub) { const tl = view.querySelector('.timeline'); if (tl) tl.outerHTML = timelineHtml(state.day); } }, 60000);
 })();
 </script>
+</body>
+</html>
